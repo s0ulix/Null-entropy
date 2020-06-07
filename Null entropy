@@ -1,0 +1,176 @@
+Hey I am s0ulix from s0ulr1pp3r which got 9th place in this you I used D4rkS0ul username though.
+
+So we have given with a enc.py file and a ciphertext and a desc.txt.
+
+desc.txt{
+
+The management staff has constantly insisted Mr. Chris Brown Chandelier to induce maximum randomness into their security algorithms. He always denied it due to the budget problems, but we think he lacks knowledge of standard applications of symmetric ciphers. Can you show him what problem his actions can produce?
+
+https://github.com/bittentech/cyberhackctf/tree/master/Null%20Entropy
+
+NOTE: The '*' character in the string means the correct byte is redacted.
+
+Author: Ansh Bhawnani
+}
+
+
+enc.py{
+from Crypto.Cipher import AES
+import binascii, sys
+from flag import flag
+
+key = "3N7g309d6Y7enT**"
+IV = flag
+
+message = 'Security is not a joke, mind it. But complete security is a myth'
+
+def encrypt(message,passphrase):
+	aes = AES.new(passphrase, AES.MODE_CBC, IV)
+	return aes.encrypt(message)
+
+print("Encrypted data: ", binascii.hexlify(encrypt(message,key)).decode())
+}
+
+ciphertext{
+TlRRcUtpb3FLaW9xS2lvcUtpb3FLaW9xS2lvcUtpb3FLaW9xS2pNMlpEUXpZU29xS2lvcUtpb3FLaW9xS2lvcUtpb3FLaW9xS2lvcUtpb3FNVFkxT0dVM0tpb3FLaW9xS2lvcUtpb3FLaW9xS2lvcUtpb3FLaW9xS2lwaVlqSmpaR0ZpWXpBeVlUQTFPR1k0WXpNNU16WmhOV1prTm1Sa1pETmpOVEEwT1RFPQ==
+}
+
+This seems intersting, some bytes from aes enc are removed, so i searched somthing about it and get some writeup which i will share down.
+so just decode the ct first
+
+we got from base64 two times
+
+{54**************************36d43a**************************1658e7**************************bb2cdabc02a058f8c3936a5fd6ddd3c50491
+}
+
+Just replace * with 0 i.e. null bytes.
+
+{540000000000000000000000000036d43a000000000000000000000000001658e700000000000000000000000000bb2cdabc02a058f8c3936a5fd6ddd3c50491}
+
+refer to this writeup to get some clearity about aes:-
+
+https://tildeho.me/ritsec-ctf-writeup-recover-aes-cbc-iv/
+
+Now break message and ct in 4 equal parts.
+Why? Just read this writeup first
+
+We will now be using there script and modifying it
+to get the last two digits of key
+
+script1{
+from Crypto.Cipher import AES
+from operator import xor
+import binascii, sys
+
+KEY_first = "3N7g309d6Y7enT"
+cipher1 = "e700000000000000000000000000bb2c" 
+cipher2 = "dabc02a058f8c3936a5fd6ddd3c50491"
+plain1 = " But complete se"
+plain2 = "curity is a myth"
+
+def decrypt(cipher, passphrase):
+    aes = AES.new(passphrase, AES.MODE_CBC, binascii.unhexlify(cipher1))
+    return aes.decrypt(cipher)
+
+# iterate through relavent ascii range
+for i in range(32, 126):
+    for j in range(32, 126):
+        key = KEY_first + chr(i) + chr(j)
+        dec_plain2 = decrypt(binascii.unhexlify(cipher2),  key)
+        if  str(dec_plain2).startswith("c") and str(dec_plain2).endswith('th'):
+            print "decrypted plain2: " + dec_plain2 + " with key: " + key
+}
+
+This give us last 2 characters of key : 3N7g309d6Y7enT1p
+
+Now we have to find the full cipher text so last part will give us 3rd, 3rd will give us 2nd,2nd will give us 1st
+And the 1st block will give us iv which is flag as given
+
+so using script
+
+script2{
+from Crypto.Cipher import AES
+import binascii, sys
+
+KEY = "3N7g309d6Y7enT1p"
+plain2 = "curity is a myth"
+
+cipher2= "dabc02a058f8c3936a5fd6ddd3c50491"
+
+def decrypt(cipher,passphrase):
+    aes = AES.new(passphrase,AES.MODE_CBC,plain2)
+    return aes.decrypt(cipher)
+
+# Output result
+print "Decrypted data: " + binascii.hexlify(decrypt(binascii.unhexlify(cipher2), KEY))
+}
+
+it will give us 3rd block as : e764f66e54397534f7d049506acabb2c
+
+using this script agin with different parameters
+
+script3{
+from Crypto.Cipher import AES
+import binascii, sys
+
+KEY = "3N7g309d6Y7enT1p"
+plain2 = " But complete se"
+
+cipher2= "e764f66e54397534f7d049506acabb2c"
+
+def decrypt(cipher,passphrase):
+    aes = AES.new(passphrase,AES.MODE_CBC,plain2)
+    return aes.decrypt(cipher)
+
+# Output result
+print "Decrypted data: " + binascii.hexlify(decrypt(binascii.unhexlify(cipher2), KEY))
+}
+
+This will give us 2nd block as result :  3a4911ae86c1f5138c2d8e17e7721658
+
+For 1st part we will use this
+
+script4{
+from Crypto.Cipher import AES
+import binascii, sys
+
+KEY = "3N7g309d6Y7enT1p"
+plain2 = "a joke, mind it."
+
+cipher2= "3a4911ae86c1f5138c2d8e17e7721658"
+
+def decrypt(cipher,passphrase):
+    aes = AES.new(passphrase,AES.MODE_CBC,plain2)
+    return aes.decrypt(cipher)
+
+# Output result
+print "Decrypted data: " + binascii.hexlify(decrypt(binascii.unhexlify(cipher2), KEY))
+}
+
+This will give output 1st block as : 54453ced1207bb9f67894d2c8ae336d4
+
+Now finally we have got the 1st block which will give us the iv
+
+For this we will use this script
+
+script5{
+rom Crypto.Cipher import AES
+import binascii, sys
+
+KEY = "3N7g309d6Y7enT1p"
+IV="Security is not "
+    
+cipher1="54453ced1207bb9f67894d2c8ae336d4"
+
+def decrypt(cipher,passphrase):
+    aes = AES.new(passphrase,AES.MODE_CBC,IV)
+    return aes.decrypt(cipher)
+
+print "decrypted data: " + decrypt(binascii.unhexlify(cipher1), KEY)
+}
+
+This will give us the iv that is the flag: {W3ak_IV_5uckS5}
+
+flag : "cyberhack{W3ak_IV_5uckS5}"
+
+Hope you liked it :)
